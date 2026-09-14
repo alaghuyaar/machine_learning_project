@@ -20,11 +20,15 @@ os.environ['PYTHONHASHSEED'] = '42'
 random.seed(42)
 
 
+
 def load_and_split_data(dataset_path:str, target_col:str = 'y',test_split:float = 0.2):
-    df = clean(dataset_path)
+    df = pd.read_csv(dataset_path,delimiter=';')
+    df = clean(df)
     X = df.drop(columns=[target_col])
-    y = LabelEncoder().fit_transform(df[target_col])
-    return train_test_split(X,y,test_size=test_split,random_state=42,stratify=y)
+    encoder = LabelEncoder()
+    y = encoder.fit_transform(df[target_col])
+    X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=test_split,random_state=42,stratify=y)
+    return  X_train, X_test, y_train, y_test, encoder
 
 def get_column_groups(X:pd.DataFrame, exclude_cols:list[str]):
     num_cols = X.select_dtypes(include='number').columns
@@ -41,7 +45,7 @@ def build_model(preprocessor:ColumnTransformer,y_train) -> dict[str,Pipeline]:
                                                                     max_iter=1000))
 
     models['random_forest'] = build_model_pipeline(preprocessor,RandomForestClassifier(max_depth=5,
-                                                                n_estimators=100,
+                                                                n_estimators=200,
                                                                 class_weight='balanced',
                                                                 random_state=42,n_jobs=-1))
 
@@ -51,7 +55,7 @@ def build_model(preprocessor:ColumnTransformer,y_train) -> dict[str,Pipeline]:
                                                                         learning_rate=5e-3))
 
     models['adaboost'] = build_model_pipeline(preprocessor,AdaBoostClassifier(estimator=estimator,
-                                                                n_estimators=100,
+                                                                n_estimators=200,
                                                                 random_state=42,
                                                                 learning_rate=5e-3))
 
@@ -106,19 +110,19 @@ def evaluate_model(X_test,y_test,model : Pipeline):
 def main():
     load_dotenv()
     DATASET_PATH = os.getenv('DATASET_PATH')
-    X_train,X_test,y_train,y_test = load_and_split_data(DATASET_PATH,'y',0.2)
+    X_train,X_test,y_train,y_test,encoder = load_and_split_data(DATASET_PATH,'y',0.2)
     num_cols,cat_cols = get_column_groups(X_train,exclude_cols=['default'])
     preprocessor = build_preprocessor(num_cols,cat_cols,['default'])
 
     models = build_model(preprocessor,y_train)
     best_model= cross_val_for_best_model(X_train,y_train,models)
     trained_model = train_best_model(X_train,y_train,best_model)
-    return X_test,y_test,trained_model
+    return X_test,y_test,trained_model,encoder
 
 
 if __name__ == '__main__':
-    X_test,y_test,final_model = main()
+    X_test,y_test,final_model,encoder = main()
     evaluate_model(X_test,y_test,final_model)
-    os.makedirs('models', exist_ok=True)
-    joblib.dump(final_model,'models/final_model.joblib')
+    os.makedirs('artifact', exist_ok=True)
+    joblib.dump({'model':final_model,'encoder':encoder},'artifact/artifacts.joblib')
 

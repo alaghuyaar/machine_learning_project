@@ -2,10 +2,6 @@ import numpy as np
 import pandas as pd
 
 
-def load_data(path:str) -> pd.DataFrame:
-    df = pd.read_csv(path,delimiter=';')
-    return df
-
 def lower_categorical_cols(df : pd.DataFrame ) -> pd.DataFrame:
     df = df.copy()
     cat_cols = df.select_dtypes(include=['object','str']).columns
@@ -30,8 +26,7 @@ def engineer_contacted_before(df : pd.DataFrame) -> pd.DataFrame:
 def drop_leaky_cols(df : pd.DataFrame, cols = ('duration',)) -> pd.DataFrame:
     return df.drop(columns=list(cols))
 
-def clean(path : str):
-    df = load_data(path)
+def clean(df : pd.DataFrame) -> pd.DataFrame:
     df = lower_categorical_cols(df)
     df = replace_unknowns(df,['default'])
     df = drop_fully_null_rows(df)
@@ -39,3 +34,4 @@ def clean(path : str):
     df = drop_leaky_cols(df)
 
     return df.reset_index(drop=True)
+
