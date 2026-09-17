@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+import logging
+from src.exceptions import DataCleaningError
+
+logger = logging.getLogger(__name__)
 
 
 def lower_categorical_cols(df : pd.DataFrame ) -> pd.DataFrame:
@@ -16,7 +20,11 @@ def replace_unknowns(df : pd.DataFrame,exclude_cols : list[str]|None = None) -> 
     return df
 
 def drop_fully_null_rows(df : pd.DataFrame) -> pd.DataFrame:
-    return df.dropna(how='all')
+    result = df.dropna(how='all')
+    if len(result) < len(df):
+        logger.info('Dropped %d fully-null rows', len(df) - len(result))
+    return result
+
 
 def engineer_contacted_before(df : pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -27,11 +35,16 @@ def drop_leaky_cols(df : pd.DataFrame, cols = ('duration',)) -> pd.DataFrame:
     return df.drop(columns=list(cols))
 
 def clean(df : pd.DataFrame) -> pd.DataFrame:
-    df = lower_categorical_cols(df)
-    df = replace_unknowns(df,['default'])
-    df = drop_fully_null_rows(df)
-    df = engineer_contacted_before(df)
-    df = drop_leaky_cols(df)
+    logger.info('Raw dataframe received : shape=%s', df.shape)
+    try:
+        df = lower_categorical_cols(df)
+        df = replace_unknowns(df,['default'])
+        df = drop_fully_null_rows(df)
+        df = engineer_contacted_before(df)
+        df = drop_leaky_cols(df)
 
-    return df.reset_index(drop=True)
-
+        logger.info('DataFrame Cleaned : shape=%s',df.shape)
+        return df.reset_index(drop=True)
+    except Exception as e:
+        logger.error('Encountered error : %s',str(e))
+        raise DataCleaningError('Failed to clean the Data') from e

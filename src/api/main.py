@@ -1,16 +1,20 @@
-from fastapi import FastAPI,Depends,HTTPException
+from fastapi import FastAPI,HTTPException
 from pydantic import BaseModel,Field,ConfigDict
 from src.data.cleaning import clean
 from dotenv import load_dotenv
-import joblib
 from src.models.predict import load_artifacts,predict_new
 import os
 import pandas as pd
+from utils.log import config_log  #for running the config file
+import logging
+from src.exceptions import DataCleaningError,PredictionError
 
 app = FastAPI()
 load_dotenv()
+config_log()
 artifact_path = os.getenv('ARTIFACT_PATH')
 artifact = load_artifacts(artifact_path)
+logger = logging.getLogger(__name__)
 
 class InputModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -47,7 +51,14 @@ def get_input(data:InputModel):
     try:
         cleaned_df = clean(raw_df)
         pred_df = predict_new(cleaned_df,artifact)
-        return {'prediction':int(pred_df['prediction'].iloc[0]),'probability':int(pred_df['probability'].iloc[0])}
+        return {'prediction':pred_df['prediction'].iloc[0],'probability':(pred_df['probability'].iloc[0]).item()}
+
+    except DataCleaningError as e:
+        raise HTTPException(status_code=400, detail='Bad Request Error')
+    
+    except PredictionError as e:
+        raise HTTPException(status_code=500, detail='Internal server error')
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error('Unhandled error during prediction: %s', str(e))
+        raise HTTPException(status_code=500, detail='Internal server error')
