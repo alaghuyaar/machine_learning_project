@@ -8,5 +8,7 @@ class PredictionError(Exception):
 
 class DataCleaningError(Exception):
     """Raised when the cleaning pipeline encounters unexpected input shape."""
-    pass
+    def __init__(self, *args,detail:str=None):
+        super().__init__(*args)
+        self.detail = detail
 
