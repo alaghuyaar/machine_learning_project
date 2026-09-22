@@ -13,34 +13,34 @@ BASE_CLEANED_COLUMN = {'age': [45,46,47,45],'job': ['admin', 'blue-collar', np.n
 
 @pytest.fixture
 def make_df():
-    def _make():
-        data = {**BASE_CLEANED_COLUMN}
-        df = pd.DataFrame(data)
-        return df
-    return _make
+    data = {**BASE_CLEANED_COLUMN}
+    df = pd.DataFrame(data)
+    return df
 
 @pytest.fixture
-def get_col():
-    def _get():
-        data = {**BASE_CLEANED_COLUMN}
-        df = pd.DataFrame(data)
-        num_cols = df.select_dtypes(include=[int,float]).columns
-        cat_cols = df.select_dtypes(include=[str,object]).columns.difference(['default','y'])
-        return (num_cols,cat_cols)
-    return _get
+def get_col(make_df):
+    df = make_df #here make_df = df (sicne we returning a Dataframe) and not a function so its' not callable
+    num_cols = df.select_dtypes(include=[int,float]).columns
+    cat_cols = df.select_dtypes(include=[str,object]).columns.difference(['default','y'])
+    return (num_cols,cat_cols)
+
 
 def test_build_preprocessor(make_df,get_col):
-    df = make_df()
-    num_cols,cat_cols = get_col()
+    df = make_df
+    num_cols,cat_cols = get_col
     preprocessor = build_preprocessor(num_cols,cat_cols,custom_cols=['default'])
-    transformed = preprocessor.fit_transform(df)
-
+    transformed = preprocessor.fit_transform(df) #column tansformer already tranform to the dense matrix
     assert not np.isnan(transformed).any()
 
 def test_build_model_pipeline(get_col):
-    num_cols,cat_cols = get_col()
+    num_cols,cat_cols = get_col
     preprocessor = build_preprocessor(num_cols,cat_cols,custom_cols=['default'])
-    model_a = build_model_pipeline(clone(preprocessor), LogisticRegression())
-    model_b = build_model_pipeline(clone(preprocessor), LogisticRegression())
+    model_a = build_model_pipeline(preprocessor, LogisticRegression())
+    model_b = build_model_pipeline(preprocessor, LogisticRegression())
+
     assert model_a.named_steps['preprocessing'] is not model_b.named_steps['preprocessing']
+    assert model_a.named_steps['preprocessing'] is not preprocessor
+
+    assert list(model_a.named_steps.keys()) == ['preprocessing','clf']
+    assert isinstance(model_a.named_steps['clf'], LogisticRegression)
     
